@@ -1,0 +1,113 @@
+; MENU: NETWORK
+/@:=BNET
+        /?:!,D
+                /B:# /C:70 /M:! /F:I,TWO /L:R /L:M:  /M:=CENTER /T:N /M:! /B:S,- /X:+3 /C:7 /T:Network
+        /!
+        /?:!,S
+                /B:# /C:70 /M:! /F:I,ONE /L:R /L:M:  /M:=CENTER /T:N /M:! /B:S,- /X:+3 /C:F /T:Network
+        /!
+        /?:!,K,U,[hD]
+                /V:V,1 /C:7 /Q:1
+        /!
+        /?:!,M,C,1
+                /V:V,1 /C:7 /Q:1
+        /!
+/#
+
+; MENU: COMPUTER
+/@:=BCOMP
+        /?:!,D
+                /B:# /C:70 /M:! /F:I,TWO /L:R /L:M:  /M:=CENTER /T:C /M:! /B:S,- /X:+3 /C:7 /T:Computer
+        /!
+        /?:!,S
+                /B:# /C:70 /M:! /F:I,ONE /L:R /L:M:  /M:=CENTER /T:C /M:! /B:S,- /X:+3 /C:F /T:Computer
+        /!
+        /?:!,K,U,[hD]
+                /V:V,1 /C:7 /Q:2
+        /!
+        /?:!,M,C,1
+                /V:V,1 /C:7 /Q:2
+        /!
+/#
+
+; MENU: OTHER
+/@:=BOTHER
+        /?:!,D
+                /B:# /C:70 /M:! /F:I,TWO /L:R /L:M:  /M:=CENTER /T:M /M:! /B:S,- /X:+3 /C:7 /T:Misc
+        /!
+        /?:!,S
+                /B:# /C:70 /M:! /F:I,ONE /L:R /L:M:  /M:=CENTER /T:M /M:! /B:S,- /X:+3 /C:F /T:Misc
+        /!
+        /?:!,K,U,[hD]
+                /V:V,1 /C:7 /Q:3
+        /!
+        /?:!,M,C,1
+                /V:V,1 /C:7 /Q:3
+        /!
+/#
+
+; MENU: UPDATE
+/@:=BUPD
+        /?:!,D
+                /B:# /C:70 /M:! /F:I,TWO /L:R /L:M:  /M:=CENTER /T:U /M:! /B:S,- /X:+3 /C:7 /T:Update
+        /!
+        /?:!,S
+                /B:# /C:70 /M:! /F:I,ONE /L:R /L:M:  /M:=CENTER /T:U /M:! /B:S,- /X:+3 /C:F /T:Update
+        /!
+        /?:!,K,U,[hD]
+                /V:V,1 /C:7 /Q:4
+        /!
+        /?:!,M,C,1
+                /V:V,1 /C:7 /Q:4
+        /!
+/#
+
+; MENU: QUIT
+/@:=BQUIT
+        /?:!,D
+                /B:# /C:70 /M:! /F:I,TWO /L:R /L:M:  /M:=CENTER /T:Q /M:! /B:S,- /X:+3 /C:7 /T:Quit
+        /!
+        /?:!,S
+                /B:# /C:70 /M:! /F:I,ONE /L:R /L:M:  /M:=CENTER /T:Q /M:! /B:S,- /X:+3 /C:C /T:Quit
+        /!
+        /?:!,K,U,[hD]
+                /V:V,1 /C:7 /Q:0
+        /!
+        /?:!,M,C,1
+                /V:V,1 /C:7 /Q:0
+        /!
+/#
+
+; MENU: QUICK: GATEWAY
+/@:=BQGW
+        /?:!,D
+                /B:# /C:70 /M:! /F:I,TWO /L:R /L:M:  /M:=CENTER /T:1 /M:! /B:S,- /X:+3 /C:7 /T:Check GW
+        /!
+        /?:!,S
+                /B:# /C:70 /M:! /F:I,ONE /L:R /L:M:  /M:=CENTER /T:1 /M:! /B:S,- /X:+3 /C:F /T:Check GW
+        /!
+        /?:!,K,U,[hD]
+                /V:V,1 /C:7 /Q:5
+        /!
+        /?:!,M,C,1
+                /V:V,1 /C:7 /Q:5
+        /!
+/#
+
+; Register active elements
+/E:R:ENET,0,4,0,2,BNET
+/E:R,ECOMP,20,24,0,2,BCOMP
+/E:R:EOTHER,40,44,0,2,BOTHER
+/E:R,EUPD,0,4,4,6,BUPD
+/E:R:EQUIT,20,24,4,6,BQUIT
+/E:R,EQGW,0,4,8,10,BQGW
+
+; Register frames
+/F:R,ONE,Ú,Ä,¿,³, ,³,À,Ä,Ù
+/F:R,TWO, , , , , , , , ,  /
+
+; Register modes
+/M:T:-cc /M:+CENTER
+
+; Hide cursor and enter dispatch loop
+/V:V,0 /D:D
