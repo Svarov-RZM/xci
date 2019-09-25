@@ -15,16 +15,20 @@ Following features are currently implemented:
 ## Cons
 Currently there's *a lot*. The program is based on the fact that reinventing the wheel is a good thing, so I try to implement as much as possible by myself with my limited programming skills. Therefore:
 
-* Almost no dynamic memory management because it's hard
+* Almost no dynamic memory management
 * Error checking is limited. If you try to fill all the console buffer with, say, dots (.) the program will most likely crash. Try this code: `xci /L:M:. /L:F`
-* No documentation. Like at all. I am currently in process of writing it. See examples to get some understanding of what this program can currently do
-* UTF-16 is not implemented correctly. The program always assumes that code symbol is 2 bytes long which is not true. It covers a lot of basic character to make it usable, though
+* UTF-16 is not implemented correctly. The program always assumes that symbol is 2 bytes long which is not true. It covers a lot of basic set (English, Russian, etc) to make it usable, though
 * And so on...
 
 So, simply speaking, xci is my hobby project and playground for learning assembler, how OS Windows works on basic level (WinAPI) and git work flow.
 
 ### Installation
-Not required. Just download xci.exe from the root of the project to a whatever place you want. Then open cmd.exe (Start->type 'cmd'->Enter) and change current directory to a place where you downloaded xci.exe. Say you downloaded it to 'C:\Temp', then you type `cd C:\Temp` [Enter] and now you can check out examples below.
+Download the latest archive from 'release' page and unpack it to whatever place you want. Then open cmd.exe (Start->type 'cmd'->Enter) and change current directory to a place where you unpacked the archive. Say you unpacked it to 'C:\Temp', then you type `cd C:\Temp` [Enter] and now you can check out examples below.
+
+### Documentation
+You can find a documentation in markdown format here: https://github.com/Svarov-RZM/xci/blob/master/Documentation/DOCUMENTATION.md
+
+Release archive also contains this file.
 
 ### Examples
 Let's finally see some examples.
@@ -43,3 +47,12 @@ Set up a rectangle to draw with the basic text drawing characters (/F:R,ONE), th
 
 `cls&xci /M:P:O /x Examples\Menu.xci`
 Execute a script from Examples\Menu.xci. This will show a simple menu which you can navigate using keyboard arrows or mouse.
+
+### Screen shots
+![menu](/Screens/menu.png)
+
+This is menu from the last example (Examples\Menu.xci).
+
+![ffmpeg menu](/Screens/ffmpeg_menu.png)
+
+This is from my simple batch script that uses ffmpeg to record or play from the web camera.
