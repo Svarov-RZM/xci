@@ -5,6 +5,77 @@
 ; as specified in the LICENSE.TXT file.
 ;
 ; >>>=== THREADS ===<<<
+; => Logic threads <=
+; IN:
+;       ESP+4 = [POINTER] Prcoedure string (@) from /H argument
+THREAD.LOGIC:
+
+; Init basic registers and stack
+mov esi,[esp+4]
+Call INIT.THREAD.BASE
+
+; Set up pointers and handles
+; Every pointer now equals to MAIN thread (we gotta fix this)
+mov eax,HEAP
+Call SETUP.POINTERS
+
+; Replace some pointer to our own private memory
+; For example, DATA must be different (see procedure below)
+Call OVERRIDE.POINTERS.THREAD
+
+; Get our thread id (TID)
+; We add position of last handle-C_HANDLE because it
+; points to a NEXT (empty) place but we need previous handle
+mov edx,[ebp-130]; Pointer to thread handles
+add edx,[THREAD.NEXT]
+sub edx,C_HANDLE
+mov eax,[edx]
+mov [ebp-260],eax; EXIT will now call EXIT.THREAD instead
+
+; Setup console handles
+mov eax,[HND.STD.IN]
+mov [ebp-122],eax
+mov eax,[HND.STD.OUT]
+mov [ebp-118],eax
+
+; Set initial console buffer state
+; Current color, DBOX structure and cursor position
+mov edi,[ebp-12]; CSBI struc
+Call INIT.INTERNAL.CONSOLE.STATE
+
+; Coorect end ov VARS array, pointer is right after procedure string
+push esi
+Call SKIP.NT.STRING
+mov eax,[esi]
+mov [ebp-40],eax
+pop esi
+
+; We set up all handles/stack/memory/etc.
+; Now we get position of procedure user specified for us
+; and jump to it
+Call GET.LABEL.VARIABLE
+test esi,esi
+je EXIT
+
+; Signal MAIN thread that it can continue execution
+mov byte [THREAD.SYNC],1
+
+; Correct arguments structure
+mov [ebp-28],ecx; Counter of ARGS array [dynamic]
+mov [ebp-20],esi; Current ARGS pointer [dynamic]
+
+; We set up stack to contain four zeroes
+; This way, when '#' hits, argument counter will be zero and
+; so MAIN.LOOP will think it's over and terminate the thread
+push ebx
+push ebx
+push ebx
+push ebx
+
+; We are now ready to execute main logic
+jmp MAIN.LOOP
+
+
 ; => Read from console  <=
 ; IN:
 ;       ESP+4 = [POINTER] Data from /R: argument to process
@@ -192,6 +263,8 @@ jne T.R.EXIT
 ; Set up INPUT_RECORD
 add esi,MAX_BUFFER/2
 push esi
+mov edx,1
+xor cx,cx; We don't use key code
 xor ax,ax
 mov al,0xD; CR
 Call PUT.CHAR.TO.CONSOLE.INPUT

@@ -15,7 +15,6 @@ Following features are currently implemented:
 ## Cons
 Currently there's *a lot*. The program is based on the fact that reinventing the wheel is a good thing, so I try to implement as much as possible by myself with my limited programming skills. Therefore:
 
-* Almost no dynamic memory management
 * Error checking is limited. If you try to fill all the console buffer with, say, dots (.) the program will most likely crash. Try this code: `xci /L:M:. /L:F`
 * UTF-16 is not implemented correctly. The program always assumes that symbol is 2 bytes long which is not true. It covers a lot of basic set (English, Russian, etc) to make it usable, though
 * And so on...

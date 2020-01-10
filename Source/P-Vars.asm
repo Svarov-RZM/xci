@@ -280,11 +280,60 @@ G.V.RET:
 Ret
 
 
+; => Get variable by type <=
+; IN:
+;       AX = [CHAR] Type of variable
+;       ESI = [POINTER] NAME of variable
+; OUT:
+;       ESI = [POINTER] DATA section
+;       ECX = [INT] Counter of DATA section
+GET.VARIABLE.BY.TYPE:
+
+; Save type and set up initial index
+; EDI is a placeholder for next VARS pointer
+push eax
+push edi
+mov edi,[ebp-36]; VARS buffer
+
+; Search variable
+G.V.B.T.LOOP:
+Call SEARCH.VAR
+cmp al,1
+jne G.V.B.T.RET.BAD
+
+; Get pointer to DATA and TYPE
+; We must preserve EDI because it points to NAME in VARS
+; This way SEARCH.VAR can continue searching futher
+mov [esp],edi
+Call SKIP.VAR.TO.DATA
+
+; Check type and repeat search if not matched
+mov edx,[esp+4]
+cmp al,dl
+je G.V.B.T.FIN
+mov edi,[esp]
+jmp short G.V.B.T.LOOP
+
+; Get values
+G.V.B.T.FIN:
+mov ecx,[edi-4]
+mov esi,edi
+jmp short G.V.B.T.RET
+
+G.V.B.T.RET.BAD:
+xor esi,esi
+
+G.V.B.T.RET:
+add esp,8; Saved pointer to VARS and TYPE
+
+Ret
+
+
 ; => Get LABEL variable <=
 ; IN:
 ;       ESI = [POINTER] NAME of variable
 ; OUT:
-;       ESI = [POINTER] Position of the next argument
+;       ESI = [POINTER] Position of the next argument or NULL if not found
 ;       ECX = [INT] Size of arguments
 GET.LABEL.VARIABLE:
 

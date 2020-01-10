@@ -14,14 +14,14 @@
 ;               '(' = Perform decrement
 ;               ')' = Perform increment
 ;       ECX = [INT] LHS
-;       EDX = [INT] RHS: Optional for '()'
+;       EDX = [INT] RHS: Not used for '()'
 ; OUT:
 ;       EAX = [INT] Result
 CALCULATE.SIMPLE:
 
 ; Determine action
 cmp al,'='
-je C.S.ASS; He-he, ass... It's from Assignment
+je C.S.ASS; He-he, ass... it's from assignment
 cmp al,'+'
 je C.S.ADD
 cmp al,'-'
@@ -68,60 +68,62 @@ Ret
 ;       ESI = [POINTER] Where to save converted number
 CONVERT.BIN.TO.STR:
 
-; Check for negative sign
-cmp eax,0x7FFFFFFF; Positive or negative?
-jnae C.B.T.S.POS; Positive
-xor dh,dh
-mov dl,"-"
-mov [esi],dx
-Call SKIP.CHAR.FORWARD
+; Start of resulting string
+push esi
+
+; Indicate a sign
+; By default it's a positive number (0)
+; if change to -1 - we'll add '-' as prefix
+push ebx
+
+; Check for negative sign and invert it if so
+; It's just easier to work with positive numbers
+cmp eax,MAX_POSITIVE_INT
+jnae C.B.T.S.POS
+neg eax
+mov [esp],eax
 
 ; Set up temp space
 C.B.T.S.POS:
-push esi; Start of resulting string
-mov ecx,17; Place to hold a 32bit integer
+mov ecx,32; Place to hold a 32/64bit integer
 Call SKIP.CHARACTERS
 Call ADD.NULL.TERMINATOR
-Call REWIND.CHAR
-
-; Convert one grade number
-cmp eax,9
-jg C.B.T.S.PREPARE
-add al,30h; 30h - 0 in ACSII
-mov [esi],ax; UTF-16 char
-jmp C.B.T.S.REP
-
-C.B.T.S.PREPARE:
-Call DISABLE.DIVISION.ROUNDING
-mov edx,10; Optimization. We'll constantly compare against it
 
 ; Convert the number
+; We continuously divide EAX by decimal base (10) and write down
+; the remainder until there's nothing left (EAX = 0)
 C.B.T.S.LOOP:
 mov ecx,10; Divider
-Call DIVIDE.INTEGER.FPU
+Call DIVIDE.INTEGER
 
-; Add char to destination
-add cl,30h; 30h - 0 in ACSII
-xor ch,ch; To make it UTF-16
-mov [esi],cx; UTF-16 char
-Call REWIND.CHAR; Next position
-cmp eax,edx; Number > 10?
-jae C.B.T.S.LOOP; Still got some work to do
+; To next position
+Call REWIND.CHAR
 
-; Finalizing
-C.B.T.S.FIN:
-test al,al; Not zero?
-je C.B.T.S.REP; Zero, no need for correction
-add al,30h; 30h - 0 in ACSII
-xor ah,ah; To make it UTF-16
-mov [esi],ax; UTF-16 char
+; Add char to destination and set next position
+; 30h = '0' in ACSII
+add cx,30h
+mov [esi],cx
 
-; Replace string
-C.B.T.S.REP:
+; Continue until we have nothing to divide
+test eax,eax
+jne C.B.T.S.LOOP
+
+; Check if we need to add sign
+pop eax
+test eax,eax
+je C.B.T.S.COPY; Nope
+
+; Add negative sign
+Call REWIND.CHAR
+mov ax,'-'
+mov [esi],ax
+
+; Restore pointer where we should place result
+; and transfer string to requested position
+C.B.T.S.COPY:
 pop edi
 Call COPY.NT.STR
 
-C.B.T.S.RET:
 Ret
 
 
@@ -132,8 +134,17 @@ Ret
 ;       EAX = [INT] Binary representation
 CONVERT.DECIMAL.STRING.TO.INTEGER:
 
-push ebx; Will be result
+; Place for sign flag and result
+push ebx; Sign
+push ebx; Result
 
+; Check for positive/negative number
+Call GET.DIRECTION.OF.DEC.NUMBER
+test ecx,ecx
+je C.D.S.T.I.FIN
+mov [esp+4],ecx
+
+; Convert to binary
 C.D.S.T.I.LOOP:
 
 ; Validate character
@@ -163,6 +174,15 @@ jmp short C.D.S.T.I.LOOP
 C.D.S.T.I.FIN:
 
 pop eax; Result
+pop ecx; Sign
+
+; Invert sign if negative number
+cmp ecx,-1
+jne C.D.S.T.I.RET
+
+neg eax
+
+C.D.S.T.I.RET:
 
 Ret
 
@@ -174,7 +194,15 @@ Ret
 ;       EAX = [INT] Binary representation
 CONVERT.HEXADECIMAL.STRING.TO.INTEGER:
 
-push ebx; Result will be here
+; Place for sign flag and result
+push ebx; Sign
+push ebx; Result
+
+; Check for positive/negative number
+Call GET.DIRECTION.OF.HEX.NUMBER
+test ecx,ecx
+je C.H.S.T.I.FIN
+mov [esp+4],ecx
 
 C.H.S.T.I.LOOP:
 
@@ -226,6 +254,15 @@ jmp short C.H.S.T.I.LOOP
 C.H.S.T.I.FIN:
 
 pop eax; Result
+pop ecx; Sign
+
+; Invert sign if negative number
+cmp ecx,-1
+jne C.H.S.T.I.RET
+
+neg eax
+
+C.H.S.T.I.RET:
 
 Ret
 
@@ -264,59 +301,117 @@ pop edi; Start of numbers
 Ret
 
 
-; => Divide integer using FPU <=
+; => Divide integer using CPU <=
 ; IN:
 ;       EAX = [INT] Divident
 ;       ECX = [INT] Divider
 ; OUT:
 ;       EAX = [INT] Result
 ;       ECX = [INT] Remainder
-DIVIDE.INTEGER.FPU:
+DIVIDE.INTEGER.CPU:
 DIVIDE.INTEGER:; Alias
 
-sub esp,12; We need 3 DWORDs for work
-mov [esp],eax; Divident
-mov [esp+4],ecx; Divider
-; [esp+8] will be remainder
+; Check for division by zero
+; We don't want to destroy the Universe... yet.
+test ecx,ecx
+je EXIT
 
-; Prepare
-fild dword [esp+4]; Divider
-fild dword [esp]; Divident
-cmp dword [esp],0x7FFFFFFF; Can't do more than 0x7FFFFFFF values
-jnae D.I.F.POS; Value is positive
-fchs; Invert the sign
+; Convert EAX to EDX:EAX
+cdq
 
-; Divide
-D.I.F.POS:
-fprem; Get remainder from division (ST0)
-fist dword [esp+8]; Store result (REMAINDER)
-fincstp; Stack correction. ST0 was remainder, but now divider
-fidivr dword [esp]; Divide number by Divident
-fist dword [esp]; New number
-ffree st0; Free registers
-ffree st7; Free registers
+; Divide and place remainder in ECX
+idiv ecx
+xchg ecx,edx
 
-; Finalizing
-mov eax,[esp]; Result
-mov ecx,[esp+8]; Remainder
-
-; Clear stack
-add esp,12
 Ret
 
 
-; => Disable rounding when dividing using FPU <=
-DISABLE.DIVISION.ROUNDING:
+; => Get direction of decimal number <=
+; IN:
+;       ESI = [POINTER] Number
+; OUT:
+;       ESI = [POINTER] Number, '-' will be skipped if negative
+;       ECX = [INT] -1 if negative, 1 if positive, 0 if not a number
+GET.DIRECTION.OF.DEC.NUMBER:
 
-sub esp,4; FPU: Control word
+; Temp result, will be OUT in the end
+; Positive by default
+mov ecx,1
 
-fstcw word [esp]; Get Control word
-mov dx,[esp]
-or dx,0C00h; Set truncate bits (will NOT round!)
-mov [esp],dx
-fldcw word [esp]; Set Control word
+; See if negative
+Call GET.CHAR
+cmp ax,'-'
+jne G.D.O.D.N.NUM
+Call SKIP.CHAR.FORWARD
+neg ecx
 
-add esp,4
+; See if it's number at all
+Call GET.CHAR
+G.D.O.D.N.NUM:
+cmp ax,'0'
+jb G.D.O.D.N.BAD
+cmp ax,'9'
+ja G.D.O.D.N.BAD
+
+Ret
+
+; Not a number
+G.D.O.D.N.BAD:
+
+xor ecx,ecx
+
+Ret
+
+
+; => Get direction of hexadecimal number <=
+; IN:
+;       ESI = [POINTER] Number
+; OUT:
+;       ESI = [POINTER] Number, '-' will be skipped if negative
+;       ECX = [INT] -1 if negative, 1 if positive, 0 if not a number
+GET.DIRECTION.OF.HEX.NUMBER:
+
+; Temp result, will be OUT in the end
+; Positive by default
+mov ecx,1
+
+; See if negative
+Call GET.CHAR
+cmp ax,'-'
+jne G.D.O.H.N.NUM
+Call SKIP.CHAR.FORWARD
+neg ecx
+
+; See if it's number at all
+Call GET.CHAR
+G.D.O.H.N.NUM:
+cmp ax,'a'
+jb G.D.O.H.N.HEXA; Lower: Maybe user typed 'A' instead of 'a'?
+cmp ax,'f'
+ja G.D.O.H.N.BAD; Greater: Not a number - abort here
+jmp short G.D.O.H.N.OK
+
+G.D.O.H.N.HEXA:
+cmp al,'A'
+jb G.D.O.H.N.DEC; Lower: Maybe it's a decimal value?
+cmp al,'F'
+ja G.D.O.H.N.BAD; Greater: Not a number - abort here
+jmp short G.D.O.H.N.OK
+
+G.D.O.H.N.DEC:
+cmp ax,'0'
+jb G.D.O.H.N.BAD
+cmp ax,'9'
+ja G.D.O.H.N.BAD
+
+G.D.O.H.N.OK:
+
+Ret
+
+; Not a number
+G.D.O.H.N.BAD:
+
+xor ecx,ecx
 
 Ret
 
@@ -332,7 +427,7 @@ MULTIPLY.INTEGER.CPU.OPTIMIZED:
 MULTIPLY.INTEGER:; Alias
 
 xchg ecx,eax
-mul ecx
+imul ecx
 
 Ret
 

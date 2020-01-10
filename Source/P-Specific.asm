@@ -467,7 +467,6 @@ Ret
 
 
 ; => Wait for flag change <=
-; Note: All flags equals 1 byte
 ; IN:
 ;       AL = [BYTE] Wait until flag equals this value
 ;       ESI = [POINTER] Flag location

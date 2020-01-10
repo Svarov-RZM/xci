@@ -1,4 +1,4 @@
-*This document describes xci version A1.0.*
+*This document describes xci version A2.0.*
 
 ## Abstraction
 The xci utility is based on a principle that everything is an argument. Everything that goes after it is a parameter to the said argument. So the following construction: `xci /C:8 /T:Test text /N` means:
@@ -36,6 +36,7 @@ The following arguments are supported:
 * **F** - Register/draw frames
 * **E** - Register/draw active elements
 * **D** - Enter navigation mode and dispatch messages
+* **I** - Send input to console
 * **x** - Execute xci script
 * **P** - Get arguments from pipe
 * **Q** - Quit the program
@@ -247,6 +248,8 @@ Sets the current DBOX (Drawing BOX). DBOX defines the area to draw for all other
 
 See the diagram below for better understanding.
 
+/B:W - Set DBOX to current maximum window size of the console buffer
+
 /B:R - Reset DBOX to the initial size of the console buffer
 
 /B:# - Set mouse position to start of DBOX: X = DBOX ROW LEFT, Y = DBOX COLUMN TOP
@@ -311,7 +314,7 @@ Creates a shadow console buffer. It can reduce flickering if you deal with a lot
 Example: `cls&xci /B:C,=0,=40,=0,=20 /b:C /b:~ /L:M,-=- /L:F /b:~ /T:We drew lines in our shadow buffer. /N /T:Now to copy it in one swift move... /S:2000 /b:~ /b:Y`
 
 ### m argument
-By default, xci only requests 8KB of RAM for storing arguments and data. It's enough for small scripts, but if you try something big, the program will quickly exceed the memory limit and crush. With this argument you can request more than 8K bytes.
+By default, xci only requests 16KB of RAM for storing arguments and data. It's enough for small scripts, but if you try something big, the program will quickly exceed the memory limit and crush. With this argument you can request more than 16K bytes.
 
 #### Synopsis
 
@@ -319,9 +322,14 @@ By default, xci only requests 8KB of RAM for storing arguments and data. It's en
 
 /m:D,[SIZE] - SIZE in bytes for data array
 
+/m:D,~ - Dynamically allocate the maximum amount of RAM based on the size of console buffer
+
 Example 1: `cls&xci /L:M,- /L:F` - This will most likely crush or produce weird results because the size of console buffer is much bigger than current memory limit
 
-Example 2: `cls&xci /m:D,3145728 /L:M,- /L:F` - This one will probably work because 3MB of RAM should be enough for default console buffer
+Example 2: `cls&xci /m:D,3145728 /L:M,- /L:F` - Allocate exactly 3MB of RAM for data buffer
+
+Example 3: `cls&xci /m:D,~ /L:M,- /L:F` - Dynamically allocate the needed size based on current console buffer. This is a recommended method for complex scripts
+
 
 ### R argument
 Read keys/chars/lines from console input.
@@ -380,6 +388,8 @@ Register an active elements. You can think of them as buttons or actually anythi
 * DBOX - DBOX structure (see 'B' argument) that determines the size of active element
 * PROCEDURE - Previously registered procedure for the label (see '@' argument)
 
+/E:E,[NAME] - Set NAME as the default active element in a menu-driven interface
+
 The 'D' argument enters a forever loop listening to console events and then dispatches them to registered active elements. It supports navigation using arrow keys and mouse. Currently accepts only 'D' parameter which means Dispatch.
 
 #### Dispatch loop
@@ -393,6 +403,37 @@ When you specify '/D:D' xci enters a loop and performs navigation between regist
 So, first you create a procedure ('@') that processes above events, then you register an active element ('E') and finally enter loop ('/D:D').
 
 Example: `cls&xci /V:V,0 /T:DOOM is a greatest game of all time: /@:=B1 /?:!,D /C:7 /B:# /T:NO /! /?:!,S /C:CF /B:# /T:NO /! /?:!,K,D,[hD] /V:V,1 /C:7 /Q:1 /! /# /@:=B2 /?:!,D /C:7 /B:# /T:YES /! /?:!,S /C:2F /B:# /T:YES /! /?:!,K,D,[hD] /V:V,1 /C:7 /Q:2 /! /# /E:R:E1,37,40,0,0,B1 /E:R:E2,41,45,0,0,B2 /D:D` - This is hell, right? It's actually not so complicated if you put it in a script (see more complicated example in 'x' argument). But anyway, this command line will register two buttons 'YES' and 'NO', then will enter dispatch loop until you hit [ENTER]. Upon exit it will set %ERRORLEVEL% to '1' or '2' depending on which button you hit.
+
+### I argument
+Sends input (currently only keys) to console (our self). If we are in a dispatch loop, we can spawn a thread and send a special key to the main loop for some special actions, e.g. to implement a timeout for default choice.
+
+#### Synopsis
+/I:[k|K],[K|C],[CODE]
+
+* [k|K] - Send key down event ('k') or key up ('K')
+* [K|C] - Send scan-code ('K') or UTF character ('C')
+* [CODE] - Numeric code for scan-code or UTF character
+
+Example: `See H argument and example ARI.xci in Examples folder`
+
+
+### H argument
+Creates a new thread. Threads in xci is a procedure specifies with '/@:= /#' construction (see '@' argument). It completely independent from the main thread, but shares an array with variables and some others structures. Total amount of threads is 8. It's VERY EXPERIMENTAL at current point.
+
+#### Synopsis
+/H:+THREAD - Create a new thread from the THREAD procedure
+
+/H:[ACTION][ID] - where [ACTION]:
+
+* \# - Pause a thread
+* ~ - Resume a thread
+* ! - Kill a thread
+* . - Wait for a thread to terminate
+
+[ID] is index of the thread to pause/kill/etc. Index starts from one and increments after each newly created thread but DON'T decrement after termination (logic is pretty simple and will be rewritten). So after executing the following construction `/H:+T1 /H:+T2` you will have 'T1' thread running as ID=1 and T2 as ID=2.
+
+Example: `cls&xci /@:=THREAD /M:#:N /M:T:N /X:=0 /Y:+1 /T:#Sleeping /N /S:5000 /T:#Sending a key /S:1000 /I:k,K,[h0D] /# /H:+THREAD /T:Press a key: /R:K,1` - We register a thread as 'THREAD' procedure, then start it (/H:+) and finally block waiting for a user to press a key (/R:). The '#' and 'T' flags order output to be written without touching the cursor position, then we wait for about 6 seconds and send '0D' key which is code for 'Enter' key.
+
 
 ### P argument
 Listen for arguments from pipe. In this case xci acts as a server. It blocks until there's something in the pipe, then processes it and goes back to listening again.

@@ -1,0 +1,84 @@
+; Thread
+/@:=THREAD
+        /@:!LOOP
+        /?:N,ne,0
+                /I:k,K,[h0]
+                /S:1000
+                /~:N,( /~:N,C,T
+                /@:)LOOP
+        /!
+
+        /I:k,K,[h1]
+/#
+
+; Pre-callback before passing message to a button
+/@:=PRE
+        /B:S,- /X:=0 /Y:=4 /C:7 /T:Default choice after: ~T~  /
+
+        /?:!,K,D,[h1]
+                /V:V,1 /C:7 /Q:0
+        /!
+/#
+
+; MENU: Abort
+/@:=BA
+        /?:!,D
+                /B:# /C:7 /L:F /T: Abort  /
+        /!
+        /?:!,S
+                /B:# /C:C /T:!Abort!
+        /!
+        /?:!,K,U,[hD]
+                /V:V,1 /C:7 /Q:2
+        /!
+        /?:!,M,C,1
+                /V:V,1 /C:7 /Q:2
+        /!
+/#
+
+; MENU: Retry
+/@:=BR
+        /?:!,D
+                /B:# /C:7 /L:F /T: Retry  /
+        /!
+        /?:!,S
+                /B:# /C:A /T:-Retry-
+        /!
+        /?:!,K,U,[hD]
+                /V:V,1 /C:7 /Q:0
+        /!
+        /?:!,M,C,1
+                /V:V,1 /C:7 /Q:0
+        /!
+/#
+
+
+; MENU: Fail
+/@:=BF
+        /?:!,D
+                /B:# /C:7 /L:F /T: Fail  /
+        /!
+        /?:!,S
+                /B:# /C:E /T:<Fail>
+        /!
+        /?:!,K,U,[hD]
+                /V:V,1 /C:7 /Q:1
+        /!
+        /?:!,M,C,1
+                /V:V,1 /C:7 /Q:1
+        /!
+/#
+
+; Set up lines
+/L:M:  /
+
+; Register active elements
+/E:R:EA,0,6,2,2,BA
+/E:R,ER,10,16,2,2,BR
+/E:R:EF,20,27,2,2,BF
+
+; Set up lines
+/~:N,N,=,60 /~:N,C,T /C:F /T:Not ready reading drive A: /N
+
+; Hide cursor and enter dispatch loop
+/M:#:-Y /M:D:P /E:A:ER /H:+THREAD /V:V,0 /D:D

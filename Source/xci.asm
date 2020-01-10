@@ -31,6 +31,9 @@ extern CloseHandle
 extern ConnectNamedPipe
 extern CreateNamedPipeW
 extern CreateThread
+extern ResumeThread
+extern SuspendThread
+extern TerminateThread
 extern DisconnectNamedPipe
 extern WriteConsoleOutputAttribute
 extern SetConsoleOutputCP
@@ -96,11 +99,19 @@ DOUBLE_CLICK EQU 2h
 ENABLE_EXTENDED_FLAGS EQU 0080h
 
 ; PROGRAM SPECIFIC
+; BASIC MACHINE STUFF
+BASIC_REGISTER EQU 4; How many bytes in a common processor register
+C_WORD EQU 2; Machine word
+C_DWORD EQU 4; Machine double word
+C_POINTER EQU 4; Size of a pointer
+C_HANDLE EQU 4; Size of a handle
+MAX_POSITIVE_INT EQU 0x7FFFFFFF
+
 ; Array containing different program-specific structures
 MAX_ARGUMENTS EQU 8192; Arguments array
 MAX_BUFFER EQU 8192; Buffer for argument processing
 MAX_READ EQU 1024; All read procedures use it exclusively
-MAX_THREADS EQU 32; Max. threads. One thread = One pointer
+MAX_THREADS EQU C_POINTER*8; Max. threads. One thread = One pointer
 MAX_CSBI EQU 22; CSBI structure
 MAX_DBOX EQU 8; DBOX structure (Drawing BOX)
 MAX_LINE EQU 24; Line structure
@@ -109,14 +120,8 @@ MAX_DATA_TOTAL EQU MAX_ARGUMENTS+MAX_BUFFER+MAX_READ+MAX_THREADS+MAX_CSBI+MAX_DB
 
 ; Version
 VER_ARCH EQU 'A'
-VER_MJ EQU 1
+VER_MJ EQU 2
 VER_MN EQU 0
-
-; BASIC MACHINE STUFF
-BASIC_REGISTER EQU 4; How many bytes in a common processor register
-C_WORD EQU 2; Machine word
-C_DWORD EQU 4; Machine double word
-C_POINTER EQU 4; Size of a pointer
 
 ; NUMBERS AND COMPORISION PREFIXES
 PREFIX_HEX EQU 00780030h; '0x' prefix
@@ -129,7 +134,7 @@ PREFIX_LSS EQU 0074006ch; 'lt' prefix
 
 ; LOGIC MODIFIERS
 ; Located in EBP structure. Changed in /M procedure
-M_SIZE EQU 14; Total size of flags
+M_SIZE EQU 16; Total size of flags
 M_T_BASE EQU 272
         M_T_ADJUST_CURSOR EQU M_T_BASE
         M_T_FORMAT_ROW EQU M_T_BASE+1
@@ -143,7 +148,9 @@ M_A_BASE EQU 280
         M_A_RESERVED EQU M_A_BASE
 M_P_BASE EQU 282
         M_P_CONVERT EQU M_P_BASE
-M_GLOBAL_BASE EQU 284
+M_D_BASE EQU 284
+        M_D_CALLBACK EQU M_D_BASE
+M_GLOBAL_BASE EQU 286
         M_GLOBAL_CURSOR EQU M_GLOBAL_BASE
         M_GLOBAL_EXPAND_VAR EQU M_GLOBAL_BASE+1
 
@@ -215,6 +222,8 @@ CODE.EXIT resd 1;q; Exit code, set by /Q procedure
 READ.CANCEL resb 1; Flag: Stop reading console if timeout is set
 READ.EVENT resd 1;q; Handle: For sync between reading threads
 READ.THREAD resd 1;q; Handle: Main reading thread
+THREAD.SYNC resb 1; Thread synchronization (see 'H' procedure)
+THREAD.NEXT resd 1; Next place in array of threads in [ebp-130]
 
 ; => IN-STACK Structure <=
 ;       CAN CONTAIN TRASH AT START/MANUAL INITIALIZATION:
@@ -243,7 +252,7 @@ READ.THREAD resd 1;q; Handle: Main reading thread
 ; EBP-118 - [HANDLE] STD.OUT [DYNAMIC]
 ; EBP-122 - [HANDLE] STD.IN [DYNAMIC]
 ; EBP-126 - [UNASSIGNED]
-; EBP-130 - [POINTER] Thread handles (MAX_THREADS). Separate threads aren't implemented yet
+; EBP-130 - [POINTER] Thread handles (MAX_THREADS)
 ; EBP-134-256 - [UNASSIGNED]
 ;       SHOULD BE ZERO AT START
 ; EBP-260 - [HANDLE] MAIN or Thread? Contains handle if thread or NULL otherwise
@@ -277,10 +286,16 @@ READ.THREAD resd 1;q; Handle: Main reading thread
 ; EBP-282 - [2 BYTES] 'P' Pipe modes:
 ;       [282] - Convert read data (see CONVERT.BYTES.TO.WIDECHAR)
 ;       [283] - RESERVED
-; EBP-284 - [2 BYTES] '#' GLOBAL procedure modes/flags:
-;       [284] - Working with external[0]/internal[!0] cursor position
-;       [285] = Perform EXPAND.VAR for procedures that support it ('T', 'A', 'L', ...)
-; EBP-286-299 - [RESERVED] Future flags
+; EBP-284 - [2 BYTES] 'D' Dispatch modes:
+;       [284] - Enable PRE/POST callbacks:
+;               'P' - PRE callback
+;               'T' - POST callback
+;               'B' - Both
+;       [285] - RESERVED
+; EBP-286 - [2 BYTES] '#' GLOBAL procedure modes/flags:
+;       [286] - Working with external[0]/internal[!0] cursor position
+;       [287] = Perform EXPAND.VAR for procedures that support it ('T', 'A', 'L', ...)
+; EBP-288-299 - [RESERVED] Future flags
 ; EBP-300 - [HANDLE] Secondary buffer handle
 ; EBP-304 - [HANDLE] Pipe handle
 ; EBP-308-512 - [UNASSIGNED]
@@ -306,7 +321,8 @@ MBI.E.SELECTED dd 0;p; Pointer to currently selected element
 MBI.E.EVENT dd 0;d; Current event for active element
 
 ; => MISC <=
-NewLine db 0Dh,0,0Ah,0,0,0,0,0
+NewLine db 0Dh,0,0Ah,0,0,0
+D_PRE dw 'P','R','E',0
 
 
 ; >>>=== CODE SECTION ===<<<
@@ -446,6 +462,10 @@ cmp dl,'F'; Register/draw frames
 je PROCESS.F
 cmp dl,'E'; Register/draw active elements
 je PROCESS.E
+cmp dl,'I'; Send input to console
+je PROCESS.I
+cmp dl,'H'; Manage threads
+je PROCESS.H
 cmp dl,'D'; Enter navigation mode and dispatch messages
 je PROCESS.D
 cmp dl,'x'; Execute xci script
@@ -1104,6 +1124,8 @@ cmp al,'A'
 je P.M.A.MODE
 cmp al,'P'
 je P.M.P.MODE
+cmp al,'D'
+je P.M.D.MODE
 cmp al,'#'; # Stands for GLOBAL mode
 je P.M.G.MODE
 cmp al,'+'; # Save mode to VARS
@@ -1188,6 +1210,11 @@ P.M.P.MODE:
 sub edi,M_P_BASE; EDI = Pointer: 'P' modes
 jmp short P.M.SET.MODE
 
+; 'D' procedure
+P.M.D.MODE:
+sub edi,M_D_BASE; EDI = Pointer: 'D' modes
+jmp short P.M.SET.MODE
+
 ; 'GLOBAL' procedure
 P.M.G.MODE:
 sub edi,M_GLOBAL_BASE; EDI = Pointer: GLOBAL modes
@@ -1263,6 +1290,8 @@ cmp al,'A'; Add new DBOX
 je P.B.ADD
 cmp al,'C'; Change currently selected DBOX
 je P.B.CHANGE
+cmp al,'W'; Set DBOX to MAX console window size
+je P.B.MAX.WINDOW
 cmp al,'R'; Reset DBOX
 je P.B.RESET
 cmp al,'#'; Set mouse position to start of current DBOX
@@ -1401,6 +1430,13 @@ mov al,1
 
 Ret
 
+; Set DBOX to maximum window size
+P.B.MAX.WINDOW:
+
+Call SET.DBOX.TO.WINDOW.SIZE
+
+jmp MAIN.LOOP
+
 ; Reset currently selected DBOX
 P.B.RESET:
 
@@ -1507,10 +1543,10 @@ PROCESS.MM:
 
 ; Check mode
 Call ACQUIRE.TWO.CHARS
-cmp al,'A'
-je P.MM.ARG; Create new buffer for arguments
-cmp al,'D'
-je P.MM.DATA; Create new buffer for data
+cmp al,'A'; Create new buffer for arguments
+je P.MM.ARG
+cmp al,'D'; Create new buffer for data
+je P.MM.DATA
 jmp MAIN.LOOP
 
 ; Redefine ARGS buffer
@@ -1540,7 +1576,43 @@ jmp MAIN.LOOP
 ; We just allocate new buffer and correct pointer to DATA
 P.MM.DATA:
 
+; Check for dynamic size first
+Call GET.CHAR
+cmp al,'~'
+je P.MM.DDYN
+
 Call CONVERT.DECIMAL.STRING.TO.INTEGER
+Call ALLOCATE.MEMORY
+
+mov [ebp-24],eax
+
+jmp MAIN.LOOP
+
+; Redefine data buffer based on actual console size
+P.MM.DDYN:
+
+; Prepare registers
+xor eax,eax
+xor ecx,ecx
+
+; Get size of console (ROWxCOLUMN)
+; Result is size in BYTES, not in CHARS
+mov edx,[ebp-12]; CSBI
+mov cx,[edx]; Row
+mov ax,[edx+C_WORD]; Column
+Call MULTIPLY.INTEGER
+
+; Correct to the size of the UTF char
+mov ecx,UTF_CHAR_SIZE
+Call MULTIPLY.INTEGER
+
+; Correct for additional attributes (color)
+mov ecx,2
+Call MULTIPLY.INTEGER
+
+; Additional space for null-terminator
+add eax,UTF_CHAR_SIZE
+
 Call ALLOCATE.MEMORY
 
 mov [ebp-24],eax
@@ -1776,6 +1848,8 @@ Call SKIP.CHAR.FORWARD
 ; Compare mode
 cmp ax,'R'
 je P.E.REGISTER
+cmp ax,'A'
+je P.E.SET.ACTIVE
 jmp EXIT; Unknown action
 
 ; Register active element
@@ -1832,6 +1906,20 @@ Call ADD.NULL.TERMINATOR
 ; Register variable
 pop esi
 Call MANAGE.VAR
+mov [MBI.E.SELECTED],edi
+
+jmp MAIN.LOOP
+
+; Set element as active
+P.E.SET.ACTIVE:
+
+; Try to find requested variable
+mov ax,'E'
+Call GET.VARIABLE.BY.TYPE
+test esi,esi
+je EXIT
+
+; Set current active element
 mov [MBI.E.SELECTED],edi
 
 jmp MAIN.LOOP
@@ -1917,7 +2005,17 @@ xor eax,eax
 mov ax,'K'
 mov [MBI.E.EVENT],eax
 
+; Call PRE callback if enabled
+mov al,[ebp-M_D_CALLBACK]
+cmp al,'P'
+jne P.D.D.L.K.LABEL
+Call DISPATCH.PRE
+; Currently we do not care if we were able to call
+; pre callback or not, in either case we assume success
+mov al,1
+
 ; Call label
+P.D.D.L.K.LABEL:
 mov [ebp-266],al
 add esi,8; DBOX structure is 8 bytes
 Call P.AT.CALL
@@ -1969,7 +2067,17 @@ xor eax,eax
 mov ax,'M'
 mov [MBI.E.EVENT],eax
 
+; Call PRE callback if enabled
+mov al,[ebp-M_D_CALLBACK]
+cmp al,'P'
+jne P.D.D.L.M.LABEL
+Call DISPATCH.PRE
+; Currently we do not care if we were able to call
+; pre callback or not, in either case we assume success
+mov al,1
+
 ; Call label
+P.D.D.L.M.LABEL:
 mov [ebp-266],al
 add esi,8; DBOX structure is 8 bytes
 Call P.AT.CALL
@@ -2113,6 +2221,168 @@ Call CLOSE.HANDLE
 jmp MAIN.LOOP
 
 
+; => 'I' Send input <=
+PROCESS.I:
+
+; Check for UP/DOWN event
+Call ACQUIRE.TWO.CHARS
+cmp ax,'K'; Key up
+je P.I.KEY.UP
+cmp ax,'k'; Key down
+je P.I.KEY.DOWN
+jmp EXIT
+
+; Set up key up event
+P.I.KEY.UP:
+xor edx,edx
+jmp short P.I.MODE
+
+; Set up key down event
+P.I.KEY.DOWN:
+mov edx,1
+
+; Check mode
+P.I.MODE:
+Call ACQUIRE.TWO.CHARS
+cmp ax,'C'; Send char
+je P.I.CHARS
+cmp ax,'K'; Send key
+je P.I.KEYS
+jmp EXIT
+
+; Send characters
+P.I.CHARS:
+
+; Prepare INPUT_RECORD structure
+push esi
+xor cx,cx; Key code does not matter
+mov ax,[esi]
+Call PUT.CHAR.TO.CONSOLE.INPUT
+pop esi
+
+; Send it to console
+mov ecx,1
+Call WRITE.CONSOLE.INPUT
+
+jmp MAIN.LOOP
+
+; Send kyes
+P.I.KEYS:
+
+; We expand complex string to allow specifying
+; unprintable key codes from 0 to 30h, e.g. [h1B]
+; Also we need to preserve edx that holds type of event
+push edx
+Call PROCESS.COMPLEX.STRING
+pop edx
+
+; Prepare INPUT_RECORD structure
+push esi
+xor ax,ax; Character does not matter
+mov cx,[esi]
+Call PUT.CHAR.TO.CONSOLE.INPUT
+pop esi
+
+; Send it to console
+mov ecx,1
+Call WRITE.CONSOLE.INPUT
+
+jmp MAIN.LOOP
+
+
+; => 'H' Create new thread with MAIN logic <=
+PROCESS.H:
+
+; Check mode
+Call ACQUIRE.CHAR
+cmp ax,'+'; Create new thread
+je P.H.START
+cmp ax,'#'; Pause thread
+je P.H.PAUSE
+cmp ax,'~'; Resume thread
+je P.H.RESUME
+cmp ax,'!'; Kill thread
+je P.H.KILL
+cmp ax,'.'; Wait for thread to comlete
+je P.H.WAIT
+jmp EXIT
+
+; Create new thread
+P.H.START:
+
+; We must include pointer to END of VARS buffer, so child thread could properly use it
+; Let's put the pointer after Label name
+push esi
+Call SKIP.NT.STRING
+mov eax,[ebp-40]
+mov [esi],eax
+pop esi
+
+; Create simple thread for logic
+mov eax,THREAD.LOGIC
+mov ecx,esi
+Call CREATE.THREAD.SIMPLE
+
+; Regiser new thread handle in the pool
+mov edx,[ebp-130]
+add edx,[THREAD.NEXT]
+mov [edx],eax
+add dword [THREAD.NEXT],C_HANDLE
+
+; Wait for child thread's initialization
+mov esi,THREAD.SYNC
+mov [esi],bl
+mov al,1
+Call WAIT.FOR.FLAG.TO.CHANGE
+
+jmp MAIN.LOOP
+
+; Pause thread's execution
+P.H.PAUSE:
+
+Call CONVERT.DECIMAL.STRING.TO.INTEGER
+
+Call GET.RUNNING.THREAD.HANDLE
+
+Call SUSPEND.THREAD
+
+jmp MAIN.LOOP
+
+; Resume thread's execution
+P.H.RESUME:
+
+Call CONVERT.DECIMAL.STRING.TO.INTEGER
+
+Call GET.RUNNING.THREAD.HANDLE
+
+Call RESUME.THREAD
+
+jmp MAIN.LOOP
+
+; Kill thread
+P.H.KILL:
+
+Call CONVERT.DECIMAL.STRING.TO.INTEGER
+
+Call GET.RUNNING.THREAD.HANDLE
+
+Call KILL.THREAD
+
+jmp MAIN.LOOP
+
+; Wait for thread's termination
+P.H.WAIT:
+
+Call CONVERT.DECIMAL.STRING.TO.INTEGER
+
+Call GET.RUNNING.THREAD.HANDLE
+
+mov ecx,INFINITE
+Call WAIT.FOR.OBJECT
+
+jmp MAIN.LOOP
+
+
 ; => 'P' Get arguments from pipe <=
 PROCESS.P:
 
@@ -2190,7 +2460,7 @@ Call EXIT.PROCESS
 
 ; >>>=== GENERAL PROCEDURES ===<<<
 %include 'P-Loops.asm'; LOOP.OVER procedures
-%include 'P-Vars.asm'; Variables-related procedures
+%include 'P-Vars.asm'; Variable-related procedures
 %include 'P-System.asm'; System-related procedures
 %include 'P-Memory.asm'; Memory management
 %include 'P-Console.asm'; Console functions
@@ -2347,5 +2617,45 @@ Call P.L.LINES.ACTION
 mov [ebp-267],bl
 
 pop esi
+
+Ret
+
+
+; >>>=== 'D' dispatch supportive procedures ===<<<
+; => Call PRE procedure <=
+; IN:
+;       AL = Not null for P.AT.CALL flag
+; OUT: VOID
+DISPATCH.PRE:
+
+push esi
+
+; Call label
+mov esi,D_PRE
+mov [ebp-266],al
+Call P.AT.CALL
+
+C.D.P.RET:
+pop esi
+
+Ret
+
+
+; >>>=== 'H' thread supportive procedures ===<<<
+; => Get handle of the requested thread <=
+; IN:
+;       EAX = [INT] Index in [ebp-130] array
+; OUT: VOID
+GET.RUNNING.THREAD.HANDLE:
+
+; Get shift in thread's array
+mov ecx,C_HANDLE
+Call MULTIPLY.INTEGER
+
+; Get handle from provided shift
+sub eax,C_HANDLE
+mov edx,[ebp-130]
+add edx,eax
+mov eax,[edx]
 
 Ret

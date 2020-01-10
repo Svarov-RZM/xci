@@ -108,21 +108,14 @@ Ret
 ; => Exit thread <=
 EXIT.THREAD:
 
-; Clear allocated buffer: Arguments
-push dword [ebp-48];3; Pointer to arguments
-push ebx;2; Flags
-push dword [HND.HEAP];1
-Call [HeapFree];:3
+; Free additionaly allocated memory
+mov eax,[ebp-24]
+mov [ebp-32],eax
+Call FREE.MEMORY
 
-; Clear allocated buffer: Data
-push dword [ebp-24];3; Pointer to data
-push ebx;2; Flags
-push dword [HND.HEAP];1
-Call [HeapFree];:3
-
-; Close handles and exit
-push dword [ebp-260];1; Handle of this thread
-Call [CloseHandle];:1
+; Close thread handle and exit
+mov eax,[ebp-260]
+Call CLOSE.HANDLE
 
 push ebx;1; Exit code
 Call [ExitThread];:1
@@ -144,6 +137,26 @@ Call [GetFileSize];:2
 
 ; We add a basic register size just to be sure there's place for additional NT
 add eax,BASIC_REGISTER
+
+Ret
+
+
+; => Override pointers for additional logic thread <=
+; Some pointers like DATA, DBOX, LINE must be different from the MAIN thread,
+; so we can change them freely without disrupting MAIN logic.
+OVERRIDE.POINTERS.THREAD:
+
+; Allocate memory
+mov eax,MAX_BUFFER+MAX_DBOX+MAX_LINE+BASIC_REGISTER
+Call ALLOCATE.MEMORY
+
+; Now override pointers
+mov [ebp-24],eax; Pointer to MAX_DATA
+add eax,MAX_BUFFER
+mov [ebp-78],eax; Pointer to MAX_DBOX structure [static]
+mov [ebp-82],eax; Pointer to MAX_DBOX structure
+add eax,MAX_DBOX
+mov [ebp-60],eax; Pointer to MAX_LINE structure
 
 Ret
 
@@ -224,6 +237,7 @@ Ret
 ; IN:
 ;       EAX = [POINTER] Heap
 SETUP.POINTERS:
+
 mov [ebp-20],eax; Pointer to arguments [DYNAMIC]
 mov [ebp-48],eax; Pointer to arguments [STATIC]
 add eax,MAX_ARGUMENTS
@@ -245,6 +259,7 @@ mov [ebp-40],eax; End of VARS
 ; Additional pointers
 ; Current limit for buffer-limited functions, such as CONVERT.BYTES.TO.WIDECHAR
 mov dword [ebp-16],MAX_BUFFER
+
 Ret
 
 
@@ -286,6 +301,29 @@ Call SETUP.POINTERS
 ; Get thread handle
 Call [GetCurrentThread]
 mov [ebp-260],eax; It's a thread. We should indicate it by placing thread handle here.
+
+Ret
+
+
+; => Kill thread <=
+; IN:
+;       EAX = [HANDLE] Thread
+KILL.THREAD:
+
+; Save thread handle
+push eax
+
+; Terminate
+push ebx;2; Exit code
+push eax;1; Thread handle
+Call [TerminateThread];:2
+
+; Restore thread handle
+pop eax
+
+; Close handle
+push eax;1
+Call [CloseHandle];:1
 
 Ret
 
@@ -334,6 +372,17 @@ Call CREATE.FILE
 Ret
 
 
+; => Resume thread <=
+; IN:
+;       EAX = [HANDLE] Thread
+RESUME.THREAD:
+
+push eax;1
+Call [ResumeThread];:1
+
+Ret
+
+
 ; => Signal event <=
 ; IN:
 ;       EAX = [HANDLE] Event to signal
@@ -353,6 +402,17 @@ SLEEP.MS:
 
 push eax;1
 Call [Sleep];:1
+
+Ret
+
+
+; => Suspend system thread <=
+; IN:
+;       EAX = [HANDLE] Thread
+SUSPEND.THREAD:
+
+push eax;1
+Call [SuspendThread];:1
 
 Ret
 

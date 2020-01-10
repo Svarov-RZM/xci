@@ -242,7 +242,6 @@ sub ax,[edi+4]; AX = COLUMN with shift from top
 inc ax; In DBOX, we draw inclusively, so Y=0,3 equals 4 columns
 mov ecx,2; Divider
 Call DIVIDE.INTEGER
-sub eax,ecx;  Correct remainder
 add ax,[edi+4]; Add shift from the top corner if any
 
 ; Make a proper COORD structure

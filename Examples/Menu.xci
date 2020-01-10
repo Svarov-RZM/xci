@@ -1,10 +1,26 @@
+; PRE
+/@:=PRE
+        /?:!,K,D,N
+                /V:V,1 /C:7 /Q:1
+        /!
+        /?:!,K,D,C
+                /V:V,1 /C:7 /Q:2
+        /!
+        /?:!,K,D,M
+                /V:V,1 /C:7 /Q:3
+        /!
+        /?:!,K,D,Q
+                /V:V,1 /C:7 /Q:4
+        /!
+/#
+
 ; MENU: NETWORK
 /@:=BNET
         /?:!,D
-                /B:# /C:70 /M:! /F:I,TWO /L:R /L:M:  /M:=CENTER /T:N /M:! /B:S,- /X:+3 /C:7 /T:Network
+                /B:# /C:70 /M:=DEFAULT /F:I,TWO /L:R /L:M:  /M:=CENTER /T:N /M:=DEFAULT /B:S,- /X:+3 /C:7 /T:Network
         /!
         /?:!,S
-                /B:# /C:70 /M:! /F:I,ONE /L:R /L:M:  /M:=CENTER /T:N /M:! /B:S,- /X:+3 /C:F /T:Network
+                /B:# /C:70 /M:=DEFAULT /F:I,ONE /L:R /L:M:  /M:=CENTER /T:N /M:=DEFAULT /B:S,- /X:+3 /C:F /T:Network
         /!
         /?:!,K,U,[hD]
                 /V:V,1 /C:7 /Q:1
@@ -17,10 +33,10 @@
 ; MENU: COMPUTER
 /@:=BCOMP
         /?:!,D
-                /B:# /C:70 /M:! /F:I,TWO /L:R /L:M:  /M:=CENTER /T:C /M:! /B:S,- /X:+3 /C:7 /T:Computer
+                /B:# /C:70 /M:=DEFAULT /F:I,TWO /L:R /L:M:  /M:=CENTER /T:C /M:=DEFAULT /B:S,- /X:+3 /C:7 /T:Computer
         /!
         /?:!,S
-                /B:# /C:70 /M:! /F:I,ONE /L:R /L:M:  /M:=CENTER /T:C /M:! /B:S,- /X:+3 /C:F /T:Computer
+                /B:# /C:70 /M:=DEFAULT /F:I,ONE /L:R /L:M:  /M:=CENTER /T:C /M:=DEFAULT /B:S,- /X:+3 /C:F /T:Computer
         /!
         /?:!,K,U,[hD]
                 /V:V,1 /C:7 /Q:2
@@ -33,10 +49,10 @@
 ; MENU: OTHER
 /@:=BOTHER
         /?:!,D
-                /B:# /C:70 /M:! /F:I,TWO /L:R /L:M:  /M:=CENTER /T:M /M:! /B:S,- /X:+3 /C:7 /T:Misc
+                /B:# /C:70 /M:=DEFAULT /F:I,TWO /L:R /L:M:  /M:=CENTER /T:M /M:=DEFAULT /B:S,- /X:+3 /C:7 /T:Misc
         /!
         /?:!,S
-                /B:# /C:70 /M:! /F:I,ONE /L:R /L:M:  /M:=CENTER /T:M /M:! /B:S,- /X:+3 /C:F /T:Misc
+                /B:# /C:70 /M:=DEFAULT /F:I,ONE /L:R /L:M:  /M:=CENTER /T:M /M:=DEFAULT /B:S,- /X:+3 /C:F /T:Misc
         /!
         /?:!,K,U,[hD]
                 /V:V,1 /C:7 /Q:3
@@ -49,10 +65,10 @@
 ; MENU: UPDATE
 /@:=BUPD
         /?:!,D
-                /B:# /C:70 /M:! /F:I,TWO /L:R /L:M:  /M:=CENTER /T:U /M:! /B:S,- /X:+3 /C:7 /T:Update
+                /B:# /C:70 /M:=DEFAULT /F:I,TWO /L:R /L:M:  /M:=CENTER /T:U /M:=DEFAULT /B:S,- /X:+3 /C:7 /T:Update
         /!
         /?:!,S
-                /B:# /C:70 /M:! /F:I,ONE /L:R /L:M:  /M:=CENTER /T:U /M:! /B:S,- /X:+3 /C:F /T:Update
+                /B:# /C:70 /M:=DEFAULT /F:I,ONE /L:R /L:M:  /M:=CENTER /T:U /M:=DEFAULT /B:S,- /X:+3 /C:F /T:Update
         /!
         /?:!,K,U,[hD]
                 /V:V,1 /C:7 /Q:4
@@ -65,10 +81,10 @@
 ; MENU: QUIT
 /@:=BQUIT
         /?:!,D
-                /B:# /C:70 /M:! /F:I,TWO /L:R /L:M:  /M:=CENTER /T:Q /M:! /B:S,- /X:+3 /C:7 /T:Quit
+                /B:# /C:70 /M:=DEFAULT /F:I,TWO /L:R /L:M:  /M:=CENTER /T:Q /M:=DEFAULT /B:S,- /X:+3 /C:7 /T:Quit
         /!
         /?:!,S
-                /B:# /C:70 /M:! /F:I,ONE /L:R /L:M:  /M:=CENTER /T:Q /M:! /B:S,- /X:+3 /C:C /T:Quit
+                /B:# /C:70 /M:=DEFAULT /F:I,ONE /L:R /L:M:  /M:=CENTER /T:Q /M:=DEFAULT /B:S,- /X:+3 /C:C /T:Quit
         /!
         /?:!,K,U,[hD]
                 /V:V,1 /C:7 /Q:0
@@ -81,10 +97,10 @@
 ; MENU: QUICK: GATEWAY
 /@:=BQGW
         /?:!,D
-                /B:# /C:70 /M:! /F:I,TWO /L:R /L:M:  /M:=CENTER /T:1 /M:! /B:S,- /X:+3 /C:7 /T:Check GW
+                /B:# /C:70 /M:=DEFAULT /F:I,TWO /L:R /L:M:  /M:=CENTER /T:1 /M:=DEFAULT /B:S,- /X:+3 /C:7 /T:Check GW
         /!
         /?:!,S
-                /B:# /C:70 /M:! /F:I,ONE /L:R /L:M:  /M:=CENTER /T:1 /M:! /B:S,- /X:+3 /C:F /T:Check GW
+                /B:# /C:70 /M:=DEFAULT /F:I,ONE /L:R /L:M:  /M:=CENTER /T:1 /M:=DEFAULT /B:S,- /X:+3 /C:F /T:Check GW
         /!
         /?:!,K,U,[hD]
                 /V:V,1 /C:7 /Q:5
@@ -106,8 +122,12 @@
 /F:R,ONE,Ú,Ä,¿,³, ,³,À,Ä,Ù
 /F:R,TWO, , , , , , , , ,  /
 
+; Register lines
+/L:M:  /
+
 ; Register modes
 /M:T:-cc /M:+CENTER
+/M:! /M:D:P /M:+DEFAULT
 
 ; Hide cursor and enter dispatch loop
 /V:V,0 /D:D

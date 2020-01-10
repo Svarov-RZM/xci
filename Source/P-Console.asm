@@ -228,6 +228,8 @@ Ret
 ; => Put a character into console input buffer <=
 ; IN:
 ;       EAX = [CHAR]
+;       EDX = [DWORD] Event: KEY_UP/DOWN
+;       CX = [KEY]
 ;       ESI = [POINTER] Place for input structure
 ; OUT:
 ;       ESI = [POINTER] Next position
@@ -239,15 +241,19 @@ mov word [esi],KEY_EVENT
 ; Skip DWORD (KEY_EVENT+Alignment)
 add esi,4
 
-; Key DOWN
-mov dword [esi],1
+; Put event: DOWN/UP
+mov dword [esi],edx
 add esi,4
 
-; Repeat count and virtual scan code
+; Repeat count
 mov [esi],bx
 add esi,2
-mov [esi],bx
+
+; Virtual key code
+mov [esi],cx
 add esi,2
+
+; Virtual scan code
 mov [esi],bx
 add esi,2
 
@@ -739,6 +745,32 @@ SET.CURRENT.COLOR:
 push eax;2
 push dword [ebp-118];1; EBP-118 = hndOut
 Call [SetConsoleTextAttribute];:2
+
+Ret
+
+
+; => Set DBOX to window size <=
+SET.DBOX.TO.WINDOW.SIZE:
+
+mov eax,[ebp-82]; EAX = Pointer: DBOX
+mov ecx,[ebp-12]; ECX = Pointer: CSBI
+
+; ROW: Left = 0
+mov [eax],bx
+
+; ROW: Right
+add eax,2
+mov dx,[ecx+14]; Window's MAX row size
+mov [eax],dx
+
+; COLUMN: Top = 0
+add eax,2
+mov [eax],bx
+
+; COLUMN: Bottom
+add eax,2
+mov dx,[ecx+16]; Window's MAX column size
+mov [eax],dx
 
 Ret
 
